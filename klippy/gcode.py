@@ -55,6 +55,8 @@ class GCodeParser:
         self.heaters = []
         self.speed = 25.0
         self.axis2pos = {'X': 0, 'Y': 1, 'Z': 2, 'E': 3}
+        self.ignore_M106 = False
+        self.fan_rate = 1.
     def register_command(self, cmd, func, when_not_ready=False, desc=None):
         if func is None:
             if cmd in self.ready_gcode_handlers:
@@ -110,7 +112,9 @@ class GCodeParser:
             'base_epos': self.base_position[3],
             'homing_xpos': self.homing_position[0],
             'homing_ypos': self.homing_position[1],
-            'homing_zpos': self.homing_position[2]
+            'homing_zpos': self.homing_position[2],
+            'ignore_M106': self.ignore_M106,
+            'fan_rate': self.fan_rate * 100.
         }
     def printer_state(self, state):
         if state == 'shutdown':
@@ -414,6 +418,11 @@ class GCodeParser:
             return
         print_time = self.toolhead.get_last_move_time()
         self.fan.set_speed(print_time, speed)
+    def get_fan_speed(self):
+        if self.fan is None:
+            return 0.
+        print_time = self.toolhead.get_last_move_time()
+        return self.fan.get_status(print_time)['speed']
     # G-Code special command handlers
     def cmd_default(self, params):
         if not self.is_printer_ready:
@@ -464,7 +473,7 @@ class GCodeParser:
         'G1', 'G4', 'G28', 'M18', 'M400',
         'G20', 'M82', 'M83', 'G90', 'G91', 'G92', 'M114', 'M220', 'M221',
         'SET_GCODE_OFFSET', 'M206',
-        'M105', 'M104', 'M109', 'M140', 'M190', 'M106', 'M107',
+        'M105', 'M104', 'M109', 'M140', 'M190', 'M106', 'M107', 'FAN',
         'M112', 'M115', 'IGNORE', 'GET_POSITION',
         'RESTART', 'FIRMWARE_RESTART', 'ECHO', 'STATUS', 'HELP']
     # G-Code movement commands
@@ -616,10 +625,31 @@ class GCodeParser:
         self.set_temp(params, is_bed=True, wait=True)
     def cmd_M106(self, params):
         # Set fan speed
-        self.set_fan_speed(self.get_float('S', params, 255., minval=0.) / 255.)
+        if not self.ignore_M106:
+            speed = self.get_float(
+                    'S', params, 255., minval=0.) * self.fan_rate / 255.
+            self.set_fan_speed(min(speed, 1.))
     def cmd_M107(self, params):
         # Turn fan off
-        self.set_fan_speed(0.)
+        if not self.ignore_M106:
+            self.set_fan_speed(0.)
+    cmd_FAN_when_not_ready = True
+    cmd_FAN_help = "Set fan speed and rate, ignore/unignore M106"
+    def cmd_FAN(self, params):
+        if 'IGNORE_M106' in params:
+            self.ignore_M106 = bool(self.get_int(
+                    'IGNORE_M106', params, 0, minval=0))
+        if 'RATE' in params:
+            self.fan_rate = self.get_float(
+                    'RATE', params, 100., minval=1.) / 100.
+            if self.is_printer_ready:
+                # Update fan speed with a new rate
+                speed = self.get_fan_speed()
+                self.set_fan_speed(min(speed * self.fan_rate, 1.))
+        if 'SPEED' in params and self.is_printer_ready:
+            new_speed = self.get_float(
+                'SPEED', params, 255., minval=0.) / 255.
+            self.set_fan_speed(new_speed)
     # G-Code miscellaneous commands
     cmd_M112_when_not_ready = True
     def cmd_M112(self, params):
