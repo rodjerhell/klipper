@@ -124,13 +124,15 @@ The following standard commands are supported:
 - `STEPPER_BUZZ STEPPER=<config_name>`: Move the given stepper forward
   one mm and then backward one mm, repeated 10 times. This is a
   diagnostic tool to help verify stepper connectivity.
-- `FAN [IGNORE_M106=<0|1>] [SPEED=<value>]`: If the `IGNORE_M106=1` parameter
-  is specified, then all the future `M106` (set fan speed) and `M107` (switch
-  fan off) commands will be ignored until the `FAN IGNORE_M106=0` command is
-  issued. `SPEED` parameter sets fan speed regardless of current `IGNORE_M106`
-  state and accepts the value in 0-255 range. This command is intended to be
-  used in display menus and host control software to override fan control
-  commands issued by slicer software.
+- `FAN [SPEED=<value>] [RATE=<value>] [IGNORE_M106=<0|1>]`: This command is
+  intended to be used in display menus and host control software to override
+  part cooling fan control commands, issued by slicer software, and manualy
+  control the fan. `SPEED` parameter accepts values in 0-255 range and sets
+  part cooling fan speed. `RATE` parameter accepts floating point values and
+  sets a coefficient applied to the values of `M106` (set fan speed) command
+  when setting fan speed. If the `IGNORE_M106=1` parameter is specified, then
+  all the future `M106` and `M107` (switch fan off) commands will be ignored
+  until the `FAN IGNORE_M106=0` command is issued.
 - `RESTART`: This will cause the host software to reload its config
   and perform an internal reset. This command will not clear error
   state from the micro-controller (see FIRMWARE_RESTART) nor will it
