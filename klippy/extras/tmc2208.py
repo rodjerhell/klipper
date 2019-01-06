@@ -237,6 +237,54 @@ class TMC2208:
             except self.printer.config_error as e:
                 raise gcode.error(str(e))
             msg = "%-15s %08x" % (reg_name + ":", val)
+            if reg_name == 'GSTAT':
+                msg += ("\n- uv_cp (undervoltage): %d\n"
+                        + "- drv_err (error shutdown): %d") % (
+                        (val >> 2) & 1,
+                        (val >> 1) & 1)
+            elif reg_name == 'IOIN':
+                msg += "\n- VERSION: 0x%02x" % ((val >> 24) & 0xff)
+            elif reg_name == 'DRV_STATUS':
+                msg += ("\n- stst (standstill): %d\n"
+                        + "- stealth (stealthChop): %d\n"
+                        + "- CS_ACTUAL (actual current scale): %d\n"
+                        + "- t157 (157 C reached): %d\n"
+                        + "- t150 (150 C reached): %d\n"
+                        + "- t143 (143 C reached): %d\n"
+                        + "- t120 (120 C reached): %d\n"
+                        + "- olb (open load B): %d\n"
+                        + "- ola (open load A): %d\n"
+                        + "- s2vsb (low side short B): %d\n"
+                        + "- s2vsa (low side short A): %d\n"
+                        + "- s2gb (short to ground B): %d\n"
+                        + "- s2ga (short to ground A): %d\n"
+                        + "- ot (overtemperature): %d\n"
+                        + "- otpw (overtemperature warning): %d") % (
+                        val >> 31,
+                        (val >> 30) & 1,
+                        (val >> 16) & 0x1f,
+                        (val >> 11) & 1,
+                        (val >> 10) & 1,
+                        (val >> 9) & 1,
+                        (val >> 8) & 1,
+                        (val >> 7) & 1,
+                        (val >> 6) & 1,
+                        (val >> 5) & 1,
+                        (val >> 4) & 1,
+                        (val >> 3) & 1,
+                        (val >> 2) & 1,
+                        (val >> 1) & 1,
+                        val & 1)
+            elif reg_name == 'PWM_SCALE':
+                msg += ("\n- PWM_SCALE_SUM: %d\n"
+                        + "- PWM_SCALE_AUTO: %d") % (
+                        val & 0xff,
+                        (-1 if ((val >> 24) & 1) else 1) * ((val >> 16) & 0xff))
+            elif reg_name == 'PWM_AUTO':
+                msg += ("\n- PWM_OFS_AUTO: %d\n"
+                        + "- PWM_GRAD_AUTO: %d") % (
+                        val & 0xff,
+                        (val >> 16) & 0xff)
             logging.info(msg)
             gcode.respond_info(msg)
 
