@@ -236,7 +236,7 @@ class TMC2208:
                 val = self.get_register(reg_name)
             except self.printer.config_error as e:
                 raise gcode.error(str(e))
-            msg = "%-15s 0x%08x" % (reg_name + ":", val)
+            msg = "%-15s %08x" % (reg_name + ":", val)
             if reg_name == 'GSTAT':
                 msg += ("\n- uv_cp (undervoltage): %d\n"
                         + "- drv_err (error shutdown): %d") % (
