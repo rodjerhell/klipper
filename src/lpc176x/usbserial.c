@@ -6,6 +6,8 @@
 
 #include <string.h> // memcpy
 #include "LPC17xx.h" // LPC_SC
+#include "autoconf.h" // CONFIG_SMOOTHIEWARE_BOOTLOADER
+#include "board/irq.h" // irq_disable
 #include "byteorder.h" // cpu_to_le32
 #include "command.h" // output
 #include "generic/usb_cdc.h" // usb_notify_ep0
@@ -244,6 +246,13 @@ usb_set_configure(void)
 void
 usb_request_bootloader(void)
 {
+    if (!CONFIG_SMOOTHIEWARE_BOOTLOADER)
+        return;
+    // The "LPC17xx-DFU-Bootloader" will enter the bootloader if the
+    // watchdog timeout flag is set.
+    irq_disable();
+    LPC_WDT->WDMOD = 0x07;
+    NVIC_SystemReset();
 }
 
 void
@@ -251,15 +260,15 @@ usbserial_init(void)
 {
     usb_irq_disable();
     // enable power
-    LPC_SC->PCONP |= (1<<31);
+    enable_pclock(PCLK_USB);
     // enable clock
     LPC_USB->USBClkCtrl = 0x12;
     while (LPC_USB->USBClkSt != 0x12)
         ;
     // configure USBD+, USBD-, and USB Connect pins
-    gpio_peripheral(0, 29, 1, 0);
-    gpio_peripheral(0, 30, 1, 0);
-    gpio_peripheral(2, 9, 1, 0);
+    gpio_peripheral(GPIO(0, 29), 1, 0);
+    gpio_peripheral(GPIO(0, 30), 1, 0);
+    gpio_peripheral(GPIO(2, 9), 1, 0);
     // setup endpoints
     realize_endpoint(EP0OUT, USB_CDC_EP0_SIZE);
     realize_endpoint(EP0IN, USB_CDC_EP0_SIZE);
