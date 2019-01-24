@@ -245,14 +245,14 @@ class TMC2208:
             elif reg_name == 'IOIN':
                 if (val >> 8) & 1:
                     # TMC220x
-                    msg += ("\n- ENN:                      %d\n"
-                            + "- MS1:                      %d\n"
-                            + "- MS2:                      %d\n"
-                            + "- DIAG:                     %d\n"
-                            + "- PDN_UART:                 %d\n"
-                            + "- STEP:                     %d\n"
+                    msg += ("\n- ENN pin:                  %d\n"
+                            + "- MS1 pin:                  %d\n"
+                            + "- MS2 pin:                  %d\n"
+                            + "- DIAG pin:                 %d\n"
+                            + "- PDN_UART pin:             %d\n"
+                            + "- STEP pin:                 %d\n"
                             + "- SEL_A (driver type):      1 (TMC220x)\n"
-                            + "- DIR:                      %d\n"
+                            + "- DIR pin:                  %d\n"
                             + "- VERSION:                  0x%02x") % (
                             val & 1,
                             (val >> 2) & 1,
@@ -264,13 +264,13 @@ class TMC2208:
                             (val >> 24) & 0xff)
                 else:
                     # TMC222x
-                    msg += ("\n- PDN_UART:                 %d\n"
-                            + "- SPREAD:                   %d\n"
-                            + "- DIR:                      %d\n"
-                            + "- ENN:                      %d\n"
-                            + "- STEP:                     %d\n"
-                            + "- MS1:                      %d\n"
-                            + "- MS2:                      %d\n"
+                    msg += ("\n- PDN_UART pin:             %d\n"
+                            + "- SPREAD pin:               %d\n"
+                            + "- DIR pin:                  %d\n"
+                            + "- ENN pin:                  %d\n"
+                            + "- STEP pin:                 %d\n"
+                            + "- MS1 pin:                  %d\n"
+                            + "- MS2 pin:                  %d\n"
                             + "- SEL_A (driver type):      0 (TMC222x)\n"
                             + "- VERSION:                  0x%02x") % (
                             (val >> 1) & 1,
