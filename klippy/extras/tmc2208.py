@@ -226,6 +226,11 @@ class TMC2208:
         return 256 >> self.mres
     def get_phase(self):
         return (self.get_register("MSCNT") & 0x3ff) >> self.mres
+    # Decode two's complement signed integer
+    def decode_signed_int(self, val, bits):
+        if ((val >> (bits - 1)) & 1):
+            return val - (1 << bits)
+        return val
     cmd_DUMP_TMC_help = "Read and display TMC stepper driver registers"
     def cmd_DUMP_TMC(self, params):
         self.printer.lookup_object('toolhead').get_last_move_time()
@@ -237,42 +242,19 @@ class TMC2208:
             except self.printer.config_error as e:
                 raise gcode.error(str(e))
             msg = "%-15s %08x" % (reg_name + ":", val)
-            if reg_name == 'GSTAT':
-                msg += ("\n- drv_err (error shutdown): %d\n"
-                        + "- uv_cp (undervoltage):     %d") % (
-                        (val >> 1) & 1,
-                        (val >> 2) & 1)
-            elif reg_name == 'IOIN':
-                if (val >> 8) & 1:
-                    # TMC220x
-                    msg += ("\n- ENN pin:                  %d\n"
-                            + "- MS1 pin:                  %d\n"
-                            + "- MS2 pin:                  %d\n"
-                            + "- DIAG pin:                 %d\n"
-                            + "- PDN_UART pin:             %d\n"
-                            + "- STEP pin:                 %d\n"
-                            + "- SEL_A (driver type):      1 (TMC220x)\n"
-                            + "- DIR pin:                  %d\n"
-                            + "- VERSION:                  0x%02x") % (
+            if "DECODE" in params:
+                if reg_name == 'GCONF':
+                    msg += ("\n- I_scale_analog(ext VREF): %d\n"
+                            + "- internal_Rsense:          %d\n"
+                            + "- en_spreadCycle:           %d\n"
+                            + "- shaft (inverse rot dir):  %d\n"
+                            + "- index_otpw:               %d\n"
+                            + "- index_step:               %d\n"
+                            + "- pdn_disable:              %d\n"
+                            + "- mstep_reg_select:         %d\n"
+                            + "- multistep_filt:           %d\n"
+                            + "- test_mode:                %d\n") % (
                             val & 1,
-                            (val >> 2) & 1,
-                            (val >> 3) & 1,
-                            (val >> 4) & 1,
-                            (val >> 6) & 1,
-                            (val >> 7) & 1,
-                            (val >> 9) & 1,
-                            (val >> 24) & 0xff)
-                else:
-                    # TMC222x
-                    msg += ("\n- PDN_UART pin:             %d\n"
-                            + "- SPREAD pin:               %d\n"
-                            + "- DIR pin:                  %d\n"
-                            + "- ENN pin:                  %d\n"
-                            + "- STEP pin:                 %d\n"
-                            + "- MS1 pin:                  %d\n"
-                            + "- MS2 pin:                  %d\n"
-                            + "- SEL_A (driver type):      0 (TMC222x)\n"
-                            + "- VERSION:                  0x%02x") % (
                             (val >> 1) & 1,
                             (val >> 2) & 1,
                             (val >> 3) & 1,
@@ -280,48 +262,164 @@ class TMC2208:
                             (val >> 5) & 1,
                             (val >> 6) & 1,
                             (val >> 7) & 1,
-                            (val >> 24) & 0xff)
-            elif reg_name == 'DRV_STATUS':
-                msg += ("\n- otpw (overtemp warning):  %d\n"
-                        + "- ot (overtemperature):     %d\n"
-                        + "- s2ga (short to ground A): %d\n"
-                        + "- s2gb (short to ground B): %d\n"
-                        + "- s2vsa (low side short A): %d\n"
-                        + "- s2vsb (low side short B): %d\n"
-                        + "- ola (open load A):        %d\n"
-                        + "- olb (open load B):        %d\n"
-                        + "- t120 (120 C reached):     %d\n"
-                        + "- t143 (143 C reached):     %d\n"
-                        + "- t150 (150 C reached):     %d\n"
-                        + "- t157 (157 C reached):     %d\n"
-                        + "- CS_ACTUAL (actual current scale): %d\n"
-                        + "- stealth (stealthChop):    %d\n"
-                        + "- stst (standstill):        %d") % (
-                        val & 1,
-                        (val >> 1) & 1,
-                        (val >> 2) & 1,
-                        (val >> 3) & 1,
-                        (val >> 4) & 1,
-                        (val >> 5) & 1,
-                        (val >> 6) & 1,
-                        (val >> 7) & 1,
-                        (val >> 8) & 1,
-                        (val >> 9) & 1,
-                        (val >> 10) & 1,
-                        (val >> 11) & 1,
-                        (val >> 16) & 0x1f,
-                        (val >> 30) & 1,
-                        val >> 31)
-            elif reg_name == 'PWM_SCALE':
-                msg += ("\n- PWM_SCALE_SUM:            %d\n"
-                        + "- PWM_SCALE_AUTO:           %d") % (
-                        val & 0xff,
-                        (-1 if ((val >> 24) & 1) else 1) * ((val >> 16) & 0xff))
-            elif reg_name == 'PWM_AUTO':
-                msg += ("\n- PWM_OFS_AUTO:             %d\n"
-                        + "- PWM_GRAD_AUTO:            %d") % (
-                        val & 0xff,
-                        (val >> 16) & 0xff)
+                            (val >> 8) & 1,
+                            (val >> 9) & 1)
+                elif reg_name == 'GSTAT':
+                    msg += ("\n- reset (driver was reset): %d\n"
+                            + "- drv_err (error shutdown): %d\n"
+                            + "- uv_cp (undervoltage):     %d") % (
+                            val & 1,
+                            (val >> 1) & 1,
+                            (val >> 2) & 1)
+                elif reg_name == 'IOIN':
+                    if (val >> 8) & 1:
+                        # TMC220x
+                        msg += ("\n- ENN pin:                  %d\n"
+                                + "- MS1 pin:                  %d\n"
+                                + "- MS2 pin:                  %d\n"
+                                + "- DIAG pin:                 %d\n"
+                                + "- PDN_UART pin:             %d\n"
+                                + "- STEP pin:                 %d\n"
+                                + "- SEL_A (driver type):      1 (TMC220x)\n"
+                                + "- DIR pin:                  %d\n"
+                                + "- VERSION:                  0x%02x") % (
+                                val & 1,
+                                (val >> 2) & 1,
+                                (val >> 3) & 1,
+                                (val >> 4) & 1,
+                                (val >> 6) & 1,
+                                (val >> 7) & 1,
+                                (val >> 9) & 1,
+                                (val >> 24) & 0xff)
+                    else:
+                        # TMC222x
+                        msg += ("\n- PDN_UART pin:             %d\n"
+                                + "- SPREAD pin:               %d\n"
+                                + "- DIR pin:                  %d\n"
+                                + "- ENN pin:                  %d\n"
+                                + "- STEP pin:                 %d\n"
+                                + "- MS1 pin:                  %d\n"
+                                + "- MS2 pin:                  %d\n"
+                                + "- SEL_A (driver type):      0 (TMC222x)\n"
+                                + "- VERSION:                  0x%02x") % (
+                                (val >> 1) & 1,
+                                (val >> 2) & 1,
+                                (val >> 3) & 1,
+                                (val >> 4) & 1,
+                                (val >> 5) & 1,
+                                (val >> 6) & 1,
+                                (val >> 7) & 1,
+                                (val >> 24) & 0xff)
+                elif reg_name == 'FACTORY_CONF':
+                    ottrim = ["OT=143C, OTPW=120C",
+                            "OT=150C, OTPW=120C",
+                            "OT=150C, OTPW=143C",
+                            "OT=157C, OTPW=143C"]
+                    msg += ("\n- FCLKTRIM:                 %d\n"
+                            + "- OTTRIM (overtemp trim):   %d (%s)") % (
+                            val & 0x1f,
+                            (val >> 8) & 0x3,
+                            ottrim[(val >> 8) & 0x3])
+                elif reg_name == 'MSCNT':
+                    msg += ("\n- MSCNT A (position A):     %d\n"
+                            + "- MSCNT B (position B):     %d") % (
+                            val & 0x3ff,
+                            ((val & 0x3ff) + 256) & 0x3ff)
+                elif reg_name == 'MSCURACT':
+                    msg += ("\n- CUR_A (current A):        %d\n"
+                            + "- CUR_B (current B):        %d") % (
+                            self.decode_signed_int(val & 0x1ff, 9),
+                            self.decode_signed_int((val >> 16) & 0x1ff, 9))
+                elif reg_name == 'CHOPCONF':
+                    msg += ("\n- toff (slow decay time):   %d (%s)\n"
+                            + "- hstrt (start hysteresis): %d (offset %d)\n"
+                            + "- hend (end hysteresis):    %d (offset %d)\n"
+                            + "- TBL (blank time):         %d (%d/fclk)\n"
+                            + "- vsense(high sensitivity): %d\n"
+                            + "- MRES (microstep res):     %d (%d usteps/step)\n"
+                            + "- intpol (interpolation):   %d\n"
+                            + "- dedge (double edge):      %d\n"
+                            + "- diss2g (short to GND protect off): %d\n"
+                            + "- diss2vs (low side short protect off): %d"
+                            ) % (
+                            val & 0xf,
+                                "%d/fclk" % (12 + 32 * (val & 0xf))
+                                    if val & 0xf else "driver off",
+                            (val >> 4) & 0x7,
+                                min(16, ((val >> 4) & 0x7) + 1
+                                    + ((val >> 7) & 0xf) - 3),
+                            (val >> 7) & 0xf,
+                                ((val >> 7) & 0xf) - 3,
+                            (val >> 15) & 0x3,
+                                16 + 8 * ((val >> 15) & 0x3),
+                            (val >> 17) & 1,
+                            (val >> 24) & 0xf,
+                                0x100 >> ((val >> 24) & 0xf),
+                            (val >> 28) & 1,
+                            (val >> 29) & 1,
+                            (val >> 30) & 1,
+                            (val >> 31) & 1)
+                elif reg_name == 'DRV_STATUS':
+                    msg += ("\n- otpw (overtemp warning):  %d\n"
+                            + "- ot (overtemperature):     %d\n"
+                            + "- s2ga (short to ground A): %d\n"
+                            + "- s2gb (short to ground B): %d\n"
+                            + "- s2vsa (low side short A): %d\n"
+                            + "- s2vsb (low side short B): %d\n"
+                            + "- ola (open load A):        %d\n"
+                            + "- olb (open load B):        %d\n"
+                            + "- t120 (120 C reached):     %d\n"
+                            + "- t143 (143 C reached):     %d\n"
+                            + "- t150 (150 C reached):     %d\n"
+                            + "- t157 (157 C reached):     %d\n"
+                            + "- CS_ACTUAL(current scale): %d\n"
+                            + "- stealth (stealthChop):    %d\n"
+                            + "- stst (standstill):        %d") % (
+                            val & 1,
+                            (val >> 1) & 1,
+                            (val >> 2) & 1,
+                            (val >> 3) & 1,
+                            (val >> 4) & 1,
+                            (val >> 5) & 1,
+                            (val >> 6) & 1,
+                            (val >> 7) & 1,
+                            (val >> 8) & 1,
+                            (val >> 9) & 1,
+                            (val >> 10) & 1,
+                            (val >> 11) & 1,
+                            (val >> 16) & 0x1f,
+                            (val >> 30) & 1,
+                            val >> 31)
+                elif reg_name == 'PWMCONF':
+                    pwm_freq = ["2/1024", "2/683", "2/512", "2/410"]
+                    freewheel = ["normal", "freewheel", "short low side",
+                            "short high side"]
+                    msg += ("\n- PWM_OFS:                  %d\n"
+                            + "- PWM_GRAD:                 %d\n"
+                            + "- pwm_freq:                 %d (%s fclk)\n"
+                            + "- pwm_autoscale:            %d\n"
+                            + "- pwm_autograd:             %d\n"
+                            + "- freewheel (brake mode):   %d (%s)\n"
+                            + "- PWM_REG:                  %d\n"
+                            + "- PWM_LIM:                  %d") % (
+                            val & 0xff,
+                            (val >> 8) & 0xff,
+                            (val >> 16) & 0x3, pwm_freq[(val >> 16) & 0x3],
+                            (val >> 18) & 0x1,
+                            (val >> 19) & 0x1,
+                            (val >> 20) & 0x3, freewheel[(val >> 20) & 0x3],
+                            (val >> 24) & 0xf,
+                            (val >> 28) & 0xf)
+                elif reg_name == 'PWM_SCALE':
+                    msg += ("\n- PWM_SCALE_SUM:            %d\n"
+                            + "- PWM_SCALE_AUTO:           %d") % (
+                            val & 0xff,
+                            self.decode_signed_int((val >> 16) & 0x1ff, 9))
+                elif reg_name == 'PWM_AUTO':
+                    msg += ("\n- PWM_OFS_AUTO:             %d\n"
+                            + "- PWM_GRAD_AUTO:            %d") % (
+                            val & 0xff,
+                            (val >> 16) & 0xff)
             logging.info(msg)
             gcode.respond_info(msg)
 

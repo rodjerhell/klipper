@@ -257,6 +257,14 @@ is enabled:
 - `DUMP_TMC STEPPER=<name>`: This command will read the TMC2130 driver
   registers and report their values.
 
+## TMC2208
+
+The following command is available when the "tmc2208" config section
+is enabled:
+- `DUMP_TMC STEPPER=<name> [DECODE=1]`: This command will read the TMC2208
+  driver registers and report their values in hexadecimal. If `DECODE`
+  parameter is given it will also report register fields as decimal values.
+
 ## Endstop adjustments by stepper phase
 
 The following commands are available when an "endstop_phase" config
