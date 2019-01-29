@@ -359,6 +359,12 @@ class TMC2208:
         self.tmcuart_send_cmd = self.mcu.lookup_command(
             "tmcuart_send oid=%c write=%*s read=%c", cq=cmd_queue)
     def handle_connect(self):
+        # IOIN has different mappings depending on the driver type
+        # (field SEL_A of IOIN reg)
+        ioin = self.get_register("IOIN")
+        drv_type = tmc2130.get_field(Fields, "IOIN", "SEL_A", ioin)
+        if drv_type == 1:
+            Fields["IOIN"] = Fields["IOIN@TMC220x"]
         for reg_name, val in self.init_regs.items():
             self.set_register(reg_name, val)
     def get_register(self, reg_name):
@@ -401,14 +407,7 @@ class TMC2208:
                 val = self.get_register(reg_name)
             except self.printer.config_error as e:
                 raise gcode.error(str(e))
-            reg_fields = Fields
-            # IOIN has different mappings depending on the driver type
-            # (field SEL_A of IOIN reg)
-            if reg_name is "IOIN":
-                drv_type = tmc2130.get_field(Fields, "IOIN", "SEL_A", val)
-                if drv_type == 1:
-                    reg_fields["IOIN"] = Fields["IOIN@TMC220x"]
-            msg = tmc2130.pretty_format(reg_fields, reg_name, val)
+            msg = tmc2130.pretty_format(Fields, reg_name, val)
             logging.info(msg)
             gcode.respond_info(msg)
 
