@@ -364,9 +364,6 @@ class TMC2208:
     def get_register(self, reg_name):
         reg = Registers[reg_name]
         msg = encode_tmc2208_read(0xf5, 0x00, reg)
-        # Skip when not connected to a real hardware
-        if self.printer.get_start_args().get('debugoutput') is not None:
-            return 0
         for retry in range(5):
             params = self.tmcuart_send_cmd.send_with_response(
                 [self.oid, msg, 10], 'tmcuart_response', self.oid)
